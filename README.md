@@ -4,7 +4,6 @@ Throughout this workshop, we will reconstruct Rotterdam using different levels o
 It includes all the steps for reconstructing a city, as well as the presentations used during the workshop. 
 
 ## 3D city model reconstruction
-___
 
 #### Python environment
 First we will create a python environment to avoid any duplication issues with your own python libraries. 
