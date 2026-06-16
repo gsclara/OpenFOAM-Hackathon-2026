@@ -3,6 +3,7 @@ This repository includes all the necessary materials for our workshop in June 20
 Throughout this workshop, we will reconstruct Rotterdam using different levels of detail. 
 It includes all the steps for reconstructing a city, as well as the presentations used during the workshop. 
 
+## 3D city model reconstruction
 ___
 
 #### Python environment
