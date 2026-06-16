@@ -1,8 +1,9 @@
-#### Hackathon_Workshop
-This repository includes all the necessary materials for our Workshop on June 2026. 
-Througout this workshop we will reconstruct Rotterdam using different level of detail. 
+# Hackathon Guimarães Green City - June 2026, Portugal
+This repository includes all the necessary materials for our workshop in June 2026, Guimarães, Portugal. 
+Throughout this workshop, we will reconstruct Rotterdam using different levels of detail. 
+It includes all the steps for reconstructing a city, as well as the presentations used during the workshop. 
 
-___
+## 3D city model reconstruction
 
 #### Python environment
 First we will create a python environment to avoid any duplication issues with your own python libraries. 
