@@ -1,0 +1,1 @@
+Download the data directory from OpenFOAM_Hackathon_2026/HandsOn_Day2/ on surfdrive:https://surfdrive.surf.nl/s/KAXpygcHE5aT5QS

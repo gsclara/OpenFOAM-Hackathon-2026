@@ -1,0 +1,251 @@
+! ================================================================
+! Input parameters for fdm-dopamine solver (Fortran namelist format)
+! ================================================================
+
+! Grid dimensions (total face points, including boundaries)
+! Interior cells = nx-1, ny-1, nz-1
+!
+! grid_type controls the vertical (y) grid distribution:
+!   1 = uniform
+!   2 = tanh, fine at both walls, coarse at centre
+!   3 = tanh, fine at bottom wall, coarse at top
+!   4 = tanh, fine at top wall, coarse at bottom
+!   5 = uniform sublayer [0,ks] with nks intervals, then
+!       symmetric tanh: fine at rough interface AND top wall
+!   6 = uniform sublayer [0,ks] with nks intervals, then
+!       tanh: fine at rough interface, coarse at top
+!   7 = uniform sublayer [0,ks] with nks intervals, then
+!       tanh: coarse at rough interface, fine at top wall
+!
+! alpha_grid controls the stretching intensity (larger = stronger clustering).
+! Ignored for grid_type=1. For grid_types 5-7, ks and nks must be set in &IBM.
+&DOMAIN
+  nx         = 514,
+  ny         = 129,
+  nz         = 258,
+  Lx         = 12.8,
+  Ly         = 2.0,
+  Lz         = 4.8,
+  alpha_grid = 1.5,
+  grid_type  = 2,
+/
+
+! Physical parameters
+&PHYSICS
+  nu                   = 0.001818181818181818,
+  dPdx                 = 1.0,
+  dPdz                 = 0.0,
+  Ub                   = 0.0,
+  wave_omega           = 2.0944,
+  sgs_model            = 1,       ! 0=DNS, 1=Vreman
+  Cs_vreman            = 0.1,
+  flat_wall_model_flag = 1,       ! 0=no-slip, 1=log-law EQWM
+/
+
+! Time-stepping and output
+&NUMERICS
+  dt           = 5.0e-3,
+  nsteps       = 100000,
+  nsave        = 500,
+  nmonitor     = 10,
+  cfl_adaptive = 1,       ! 0=fixed dt, 1=adaptive dt
+  cfl_target   = 0.8,     ! target CFL number (adaptive mode)
+  cfl_safety   = 1.0,     ! safety factor on dt adjustment
+  dt_min       = 1.0e-8,  ! minimum allowed dt
+  dt_max       = 1.0e10,  ! maximum allowed dt
+/
+
+! Wall boundary condition types (1=Dirichlet no-slip, 2=Neumann free-slip)
+! Omit this group to use defaults (both walls no-slip)
+&BOUNDARY_CONDITIONS
+  bc_face_ylo = 1,
+  bc_face_yhi = 1,
+/
+
+! Immersed boundary method
+! ibm_input_mode: 0=no body
+!                 1=read Umask_in (binary face-point mask; phi via fast-sweep)
+!                 2=read SDF_in only (precomputed cell-centre signed-distance;
+!                   Umask_in is NOT read — solid/fluid derived from sign(phi))
+! ibm_wall_model_flag: 0=DNS no-slip, 1=log-law EQWM
+! Omit this group if no IBM body is present
+&IBM
+  ibm_input_mode      = 0,
+  ibm_wall_model_flag = 0,
+  ibm_mask_file       = 'Umask_in',
+  ibm_sdf_file        = 'SDF_in',
+  ks                  = 0.00242,
+  nks                 = 20,
+  nsampling           = 0,   ! IBM force output interval (0=disabled)
+/
+
+! Initial conditions
+! ic_type:
+!   1 = log-law profile + white noise  (profile mirrored for no-slip top,
+!       applied from bottom wall only for free-slip top; u_tau estimated
+!       from dPdx and bc_face_yhi)
+!   2 = linear profile  + white noise  (tent function for no-slip top,
+!       linear ramp 0→Utarget for free-slip top)
+!   3 = zero mean + white noise
+!   4 = Reichardt turbulent channel profile + structured perturbation
+!       Builds the composite Reichardt (1951) law-of-the-wall profile scaled
+!       by u_tau = sqrt(|dPdx|*Ly/2), mirrored symmetrically for a two-wall
+!       channel.  Peak centreline velocity ≈ U_cl+ * u_tau (≈18 m/s for
+!       Re_tau≈395 with nu=1e-6).  Perturbations are structured sinusoidal
+!       waves rather than white noise.
+!   5 = Inverse-linear profile + white noise
+!       Anti-tent (closed channel, bc_face_yhi=1):
+!         U = Utarget * (1 - 2*min(y,Ly-y)/Ly)  — Utarget at walls, 0 at centre
+!       Inverted ramp (open channel, bc_face_yhi=2):
+!         U = Utarget * (1 - y/Ly)              — Utarget at bottom, 0 at top
+!       Large |dU/dy| throughout imposes a strong destabilising shear to
+!       promote rapid laminar-to-turbulent transition.
+!
+! noise_percent: white-noise amplitude as % of Utarget (applied to U,V,W
+!               for ic_types 1-3; ignored for ic_type=4)
+&INITIAL_CONDITIONS
+  Utarget      = 20,
+  ic_type      = 5,
+  noise_percent  = 5.0,
+  nstep_init     = 49500,       ! starting step number (for hot-start)
+  restart        = 1,       ! 0=fresh run, 1=hot-start from filein
+  scalar_restart = 0,       ! 1=read C from restart file (default)
+                            ! 0=initialise C from IC even when restart=1
+                            !   (use this when the restart file contains only
+                            !    velocity/pressure and has no scalar block)
+/
+
+! File paths
+&IO
+  filein  = 'fields/leschan_550.49500',
+  fileout = 'leschan_550',
+/
+
+! Reynolds stress budget (optional — omit this group to disable)
+!
+! rsb_active:  0=disabled, 1=enabled
+! rsb_freq:    Accumulate statistics every rsb_freq steps; write one window
+!              and reset accumulators after each rsb_freq steps.
+!              (So each output sample represents rsb_freq snapshots.)
+! rsb_nstart:  Step index at which accumulation begins (skip transient spin-up).
+! rsb_hom_dir: Comma-separated list of homogeneous averaging directions:
+!              ''    = no averaging  → 3D field (nxm, nym, nzm, nsamples)
+!              'x'   = average along x → (1, nym, nzm, nsamples)
+!              'z'   = average along z → (nxm, nym, 1, nsamples)
+!              'x,z' = average along x and z → (1, nym, 1, nsamples)  ← channel
+! rsb_fileout: Base path for output files (e.g. 'stats/rsb').
+!              Produces: <base>_Umean.bin  (nc=3)  mean velocity
+!                        <base>_Rij.bin    (nc=6)  Reynolds stresses
+!                        <base>_Pij.bin    (nc=6)  production
+!                        <base>_epsRes.bin (nc=6)  resolved dissipation
+!                        <base>_epsSGS.bin (nc=6)  SGS dissipation
+!                        <base>_PiStrain.bin (nc=6) pressure-strain
+!                        <base>_DTij.bin   (nc=6)  turbulent diffusion
+!                        <base>_Dnuij.bin  (nc=6)  viscous diffusion
+!                        <base>_PhiPij.bin (nc=6)  pressure diffusion
+!                        <base>_Resid.bin  (nc=6)  budget residual
+!                        <base>.meta             metadata (text)
+!
+! All .bin files: little-endian float64, no record markers.
+! Layout in each file: (nc, out_nx, out_ny, out_nz) per sample, nsamples total.
+! Component order for 6-component tensors: 11, 22, 33, 12, 13, 23.
+!
+! Restart safety: on restart=1 the module reads nsamples from <base>.meta
+! and continues appending.  A fresh run (restart=0) truncates existing files.
+&STATISTICS
+  rsb_active  = 0,
+  rsb_freq    = 200,
+  rsb_nstart  = 50000,
+  rsb_hom_dir = 'x,z',
+  rsb_fileout = 'stats/rsb',
+!
+! ---- 2-D planar slice probes (up to 8) ----
+!
+! n_slices:       number of slices (0 = disabled)
+! slice_freq:     output every slice_freq steps (shared by all slices)
+! slice_dir(n):   normal direction of slice n: 'x', 'y', or 'z'
+! slice_pos(n):   physical coordinate along the normal direction
+! slice_comps(n): velocity/pressure components to save, any subset of
+!                 'U', 'V', 'W', 'P' concatenated (e.g. 'UVW', 'UVWP', 'U')
+!                 Default (empty string): 'UVW'
+! slice_fileout(n): base path for output files (no extension), e.g. 'slices/z05'
+!
+! File output (rank 0, stream unformatted, big-endian float64):
+!   <fileout>.bin     — appends (ncomp, n1, n2) float64 per step
+!   <fileout>_meta.txt — text: ncomp, n1, n2, dir, pos, comps, nsnaps
+! where n1 x n2 depends on orientation:
+!   x-normal: (nym_global, nzm_global)
+!   y-normal: (nxm_global, nzm_global)
+!   z-normal: (nxm_global, nym_global)
+! All values are cell-centre interpolated.
+!
+!  n_slices = 2,
+!  slice_freq = 50,
+!  slice_dir(1) = 'z',  slice_pos(1) = 0.5,  slice_comps(1) = 'UVW',  slice_fileout(1) = 'slices/z05',
+!  slice_dir(2) = 'y',  slice_pos(2) = 1.0,  slice_comps(2) = 'UVWP', slice_fileout(2) = 'slices/y10',
+!
+! ---- 1-D line probes (up to 8) ----
+!
+! n_lines:        number of lines (0 = disabled)
+! line_freq:      output every line_freq steps (shared by all lines)
+! line_dir(n):    direction along the line: 'x', 'y', or 'z'
+! line_pos1(n):   physical coordinate in the 1st transverse direction
+!                 (x-line: y-coord; y-line: x-coord; z-line: x-coord)
+! line_pos2(n):   physical coordinate in the 2nd transverse direction
+!                 (x-line: z-coord; y-line: z-coord; z-line: y-coord)
+! line_start(n):  start coordinate along the line axis (default: 0.0 = full)
+! line_end(n):    end   coordinate along the line axis (default: 1e30 = full)
+! line_comps(n):  components to save (same syntax as slice_comps)
+! line_fileout(n): base path for output files (no extension)
+!
+! File output:
+!   <fileout>.bin     — appends (ncomp, npts) float64 per step
+!   <fileout>_meta.txt — text: ncomp, npts, dir, comps, nsnaps
+!
+!  n_lines = 1,
+!  line_freq = 50,
+!  line_dir(1) = 'y',  line_pos1(1) = 0.5, line_pos2(1) = 0.5,
+!  line_start(1) = 0.0, line_end(1) = 2.0,
+!  line_comps(1) = 'UVW',  line_fileout(1) = 'lines/centerline',
+/
+
+! Suspended sediment scalar transport (optional — omit this group to disable)
+!
+! sediment_flag: 0=off, 1=passive scalar with Soulsby settling velocity
+!
+! Particle / fluid properties (used to compute settling velocity ws via
+! Soulsby 1997):
+!   d_s   = particle diameter [m]
+!   rho_s = particle density  [kg/m^3]
+!   rho_f = fluid density     [kg/m^3]
+!   grav  = gravitational acceleration [m/s^2]
+!
+! Diffusion:
+!   Sc    = molecular Schmidt number  (kappa_mol = nu/Sc)
+!   Sc_t  = turbulent Schmidt number  (kappa_sgs = nu_t/Sc_t)
+!
+! Bottom boundary condition:
+!   sed_bc_bot: 0 = zero normal flux (insulating/reflecting)
+!               1 = equilibrium concentration C_ref imposed at bottom wall
+!   C_ref = reference near-bed concentration (used when sed_bc_bot=1)
+!
+! Initial scalar profile:
+!   C_ic_type:  0 = uniform C_ref throughout domain
+!               1 = Rouse equilibrium profile
+!               2 = linear ramp from C_ref (bottom) to 0 (top)
+!               3 = slab: C=C_ref for y < C_ic_height, C=0 above
+!   C_ic_height = slab height [m] (used only when C_ic_type=3)
+!
+&SEDIMENT
+  sediment_flag = 0,
+  d_s           = 1.0e-4,
+  rho_s         = 2650.0,
+  rho_f         = 1000.0,
+  grav          = 9.81,
+  Sc            = 1.0,
+  Sc_t          = 0.7,
+  C_ref         = 0.0,
+  sed_bc_bot    = 0,
+  C_ic_type     = 0,
+  C_ic_height   = 0.0,
+/
