@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # Source OpenFOAM (Define the bashrc of your local openfoam location)
 source /usr/lib/openfoam/openfoam2412/etc/bashrc &> /dev/null
 # SnappyHex in parallel? ( 1 = Yes, 0 = No )
