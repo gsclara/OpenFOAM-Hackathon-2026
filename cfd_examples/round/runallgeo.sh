@@ -51,7 +51,7 @@ if [ $snapPar ]; then
 	# Run check mesh for sanity
 	echo "Running checkmesh utility......."
 	mpirun -np $nprocs checkMesh -latestTime -parallel > logs/checkMesh.log 2>&1
-else;
+else
 	echo "Snappy Hex Mesh runs in serial......"
 	# Generate the snappyHexMesh
 	echo "To follow the progress for snappyHexMesh, read logs/snappyHex.log....."
